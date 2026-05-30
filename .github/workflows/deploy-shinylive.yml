@@ -34,9 +34,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libuv1-dev libarchive-dev
 
-      - name: Install Shinylive R Package
+      - name: Install R Packages
         run: |
-          Rscript -e "install.packages('shinylive', repos = 'https://cran.rstudio.com/')"
+          Rscript -e "install.packages(c('shinylive', 'lme4', 'emmeans', 'bslib'), repos = 'https://cran.rstudio.com/')"
           
       - name: Build Shinylive App
         run: |
