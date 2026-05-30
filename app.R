@@ -145,13 +145,21 @@ server <- function(input, output, session) {
         class = "bg-light mb-4 border-primary",
         card_header("1. Overall Multi-Environment Variance (Stage 2)", class = "bg-primary text-white"),
         card_body(
-          # fill = FALSE prevents the squished boxes in Shinylive
-          layout_column_wrap(
-            width = 1/3,
-            fill = FALSE, 
-            value_box("Genotype Variance", value = res$stats$Vg, theme = "primary"),
-            value_box("Trial Variance", value = res$stats$Vt, theme = "secondary"),
-            value_box("Residual Variance", value = res$stats$Ve, theme = "info")
+          # Using standard HTML Bootstrap cards for guaranteed stability in the browser
+          layout_columns(
+            col_widths = c(4, 4, 4),
+            div(class = "card text-white bg-primary mb-3 text-center p-2",
+                div(class = "card-header", "Genotype Variance"),
+                div(class = "card-body", h3(class="card-title", res$stats$Vg))
+            ),
+            div(class = "card text-white bg-secondary mb-3 text-center p-2",
+                div(class = "card-header", "Trial Variance"),
+                div(class = "card-body", h3(class="card-title", res$stats$Vt))
+            ),
+            div(class = "card text-white bg-info mb-3 text-center p-2",
+                div(class = "card-header", "Residual Variance"),
+                div(class = "card-body", h3(class="card-title", res$stats$Ve))
+            )
           ),
           hr(),
           h4(HTML(paste0("Overall Cullis Heritability (H&sup2;): <strong class='text-primary'>", res$stats$H2, "</strong>")))
@@ -190,12 +198,22 @@ server <- function(input, output, session) {
   output$tbl_s1 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s1
-  }, options = list(pageLength = 50, scrollX = TRUE))
+  }, options = list(
+    pageLength = 50, 
+    scrollX = TRUE, 
+    scrollY = "300px",       # Locks height and adds a vertical scrollbar
+    scrollCollapse = TRUE    # Snaps tight if there are fewer than 300px of rows
+  ))
   
   output$tbl_s2 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s2
-  }, options = list(pageLength = 50, scrollX = TRUE))
+  }, options = list(
+    pageLength = 50, 
+    scrollX = TRUE, 
+    scrollY = "400px",       # Gives slightly more height to the final results
+    scrollCollapse = TRUE
+  ))
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
