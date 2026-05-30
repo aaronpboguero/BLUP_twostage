@@ -5,9 +5,13 @@ library(lme4)
 library(emmeans)
 
 # --- USER INTERFACE ---
+# --- USER INTERFACE ---
 ui <- page_sidebar(
   title = "Multi-Environment Trial Analyzer (Two-Stage Model)",
   theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#2563eb"),
+  
+  # THIS IS THE MAGIC BULLET: It stops the app from cramming into the screen height
+  fillable = FALSE, 
   
   # Sidebar for controls
   sidebar = sidebar(
@@ -198,22 +202,12 @@ server <- function(input, output, session) {
   output$tbl_s1 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s1
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE, 
-    scrollY = "300px",       # Locks height and adds a vertical scrollbar
-    scrollCollapse = TRUE    # Snaps tight if there are fewer than 300px of rows
-  ))
+  }, options = list(pageLength = 50, scrollX = TRUE))
   
   output$tbl_s2 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s2
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE, 
-    scrollY = "400px",       # Gives slightly more height to the final results
-    scrollCollapse = TRUE
-  ))
+  }, options = list(pageLength = 50, scrollX = TRUE))
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
