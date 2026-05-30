@@ -36,7 +36,7 @@ jobs:
 
       - name: Install R Packages
         run: |
-          Rscript -e "install.packages(c('shinylive', 'lme4', 'emmeans', 'bslib'), repos = 'https://cran.rstudio.com/')"
+          Rscript -e "install.packages(c('shinylive', 'lme4', 'emmeans', 'shinyNextUI'), repos = 'https://cran.rstudio.com/')"
           
       - name: Build Shinylive App
         run: |
