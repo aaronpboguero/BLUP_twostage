@@ -1,11 +1,9 @@
 name: Deploy Shinylive App to GitHub Pages
 
-# This tells GitHub to run this script every time you push to the main branch
 on:
   push:
     branches: [ "main", "master" ]
 
-# Sets permissions to allow the script to upload the website
 permissions:
   contents: read
   pages: write
@@ -30,6 +28,11 @@ jobs:
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: 'release'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libuv1-dev libarchive-dev
 
       - name: Install Shinylive R Package
         run: |
