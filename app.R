@@ -202,12 +202,20 @@ server <- function(input, output, session) {
   output$tbl_s1 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s1
-  }, options = list(pageLength = 50, scrollX = TRUE))
+  }, options = list(
+    pageLength = 50, 
+    scrollX = TRUE,
+    scrollY = "400px",      # Capped height for Step 2
+    scrollCollapse = TRUE   # Snaps tight if there are fewer than 400px of rows
+  ))
   
   output$tbl_s2 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s2
-  }, options = list(pageLength = 50, scrollX = TRUE))
+  }, options = list(
+    pageLength = 50, 
+    scrollX = TRUE          # No height limit for Step 3, let it flow!
+  ))
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
