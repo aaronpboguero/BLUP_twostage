@@ -145,7 +145,10 @@ server <- function(input, output, session) {
         class = "bg-light mb-4 border-primary",
         card_header("1. Overall Multi-Environment Variance (Stage 2)", class = "bg-primary text-white"),
         card_body(
-          layout_columns(
+          # fill = FALSE prevents the squished boxes in Shinylive
+          layout_column_wrap(
+            width = 1/3,
+            fill = FALSE, 
             value_box("Genotype Variance", value = res$stats$Vg, theme = "primary"),
             value_box("Trial Variance", value = res$stats$Vt, theme = "secondary"),
             value_box("Residual Variance", value = res$stats$Ve, theme = "info")
@@ -187,12 +190,12 @@ server <- function(input, output, session) {
   output$tbl_s1 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s1
-  }, options = list(pageLength = 5, scrollX = TRUE))
+  }, options = list(pageLength = 50, scrollX = TRUE))
   
   output$tbl_s2 <- renderDataTable({
     req(analysis_results())
     analysis_results()$s2
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  }, options = list(pageLength = 50, scrollX = TRUE))
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
