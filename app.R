@@ -20,6 +20,19 @@ ui <- bootstrapPage(
               p(class = "text-gray-500 text-sm", "Note: Processing complex LMMs in the browser may take a few moments depending on dataset size.")
           ),
           
+          # --- INSTRUCTION CARD ---
+          # This will hide automatically once output.analysis_ready becomes TRUE
+          conditionalPanel(
+            condition = "!output.analysis_ready",
+            div(class = "bg-blue-50 rounded-xl shadow-sm p-6 border border-blue-100 mb-2",
+                h3(class = "text-lg font-bold text-blue-800 mb-3", "How to format your CSV:"),
+                ul(class = "list-disc list-inside text-sm text-blue-900 space-y-2",
+                   li(tags$strong("Required Columns: "), tags$code("Name"), " (Genotype), ", tags$code("Rep"), ", and ", tags$code("YLD_MKT.P"), " (Numeric trait)."),
+                   li(tags$strong("Trial Identification: "), "Include a ", tags$code("Trial.Code"), " column. Alternatively, include both ", tags$code("Location"), " and ", tags$code("Season"), " and the app will generate the trial code for you."),
+                   li(tags$strong("Optional: "), "Include a ", tags$code("Block"), " column to automatically fit an incomplete block model (Rep:Block).")
+                )
+            )
+          ),
           # Upload Controls
           div(class = "bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row gap-4 items-end",
               div(class = "flex-1 w-full",
