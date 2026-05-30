@@ -30,9 +30,60 @@ ui <- bootstrapPage(
               )
           ),
           
-          # Main panel for results
+          # Error display
           uiOutput("error_ui"),
-          uiOutput("results_ui")
+          
+          # SHINYLIVE FIX: Use conditionalPanel instead of renderUI for complex HTML widgets
+          conditionalPanel(
+            condition = "output.analysis_ready",
+            
+            # Top level stats
+            div(class = "bg-white rounded-xl shadow-sm border border-blue-200 mb-8 overflow-hidden",
+                div(class = "bg-blue-600 text-white px-6 py-3 font-semibold", "1. Overall Multi-Environment Variance (Stage 2)"),
+                div(class = "p-6",
+                    div(class = "grid grid-cols-1 md:grid-cols-3 gap-4 mb-6",
+                        div(class = "bg-blue-50 rounded-lg p-4 text-center border border-blue-100",
+                            div(class = "text-xs text-blue-600 font-bold uppercase tracking-wider", "Genotype Variance"),
+                            div(class = "text-3xl font-bold text-blue-900 mt-1", textOutput("vg_val", inline = TRUE))
+                        ),
+                        div(class = "bg-gray-50 rounded-lg p-4 text-center border border-gray-200",
+                            div(class = "text-xs text-gray-500 font-bold uppercase tracking-wider", "Trial Variance"),
+                            div(class = "text-3xl font-bold text-gray-800 mt-1", textOutput("vt_val", inline = TRUE))
+                        ),
+                        div(class = "bg-indigo-50 rounded-lg p-4 text-center border border-indigo-100",
+                            div(class = "text-xs text-indigo-600 font-bold uppercase tracking-wider", "Residual Variance"),
+                            div(class = "text-3xl font-bold text-indigo-900 mt-1", textOutput("ve_val", inline = TRUE))
+                        )
+                    ),
+                    hr(class = "border-gray-200 mb-4"),
+                    uiOutput("h2_ui")
+                )
+            ),
+            
+            # Stage 1 Table
+            div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
+                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
+                    span(class = "font-semibold text-gray-800", "2. Stage 1: Trial BLUEs & Reliability Weights"),
+                    downloadButton("dl_s1", "Download BLUEs", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
+                ),
+                div(class = "p-6",
+                    p(class = "text-sm text-gray-500 mb-4", "Notice the Weight column. Trials with high Standard Errors (SE) receive tiny weights."),
+                    DTOutput("tbl_s1")
+                )
+            ),
+            
+            # Stage 2 Table
+            div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
+                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
+                    span(class = "font-semibold text-gray-800", "3. Final Multi-Environment BLUPs (Stage 2)"),
+                    downloadButton("dl_s2", "Download BLUPs", class = "bg-white hover:bg-gray-100 text-green-600 font-medium py-1 px-3 border border-green-200 rounded text-sm transition")
+                ),
+                div(class = "p-6",
+                    uiOutput("gm_ui"),
+                    DTOutput("tbl_s2")
+                )
+            )
+          )
       )
   )
 )
@@ -42,6 +93,12 @@ server <- function(input, output, session) {
   
   analysis_results <- reactiveVal(NULL)
   error_msg <- reactiveVal(NULL)
+  
+  # Reactive flag to reveal the results panel
+  output$analysis_ready <- reactive({
+    !is.null(analysis_results())
+  })
+  outputOptions(output, "analysis_ready", suspendWhenHidden = FALSE)
   
   # Trigger analysis on button click
   observeEvent(input$run, {
@@ -148,78 +205,38 @@ server <- function(input, output, session) {
     div(class = "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4", error_msg())
   })
   
-  output$results_ui <- renderUI({
+  # Map top-level stats individually
+  output$vg_val <- renderText({ req(analysis_results()); analysis_results()$stats$Vg })
+  output$vt_val <- renderText({ req(analysis_results()); analysis_results()$stats$Vt })
+  output$ve_val <- renderText({ req(analysis_results()); analysis_results()$stats$Ve })
+  
+  output$h2_ui <- renderUI({
     req(analysis_results())
-    res <- analysis_results()
-    
-    tagList(
-      # Top level stats
-      div(class = "bg-white rounded-xl shadow-sm border border-blue-200 mb-8 overflow-hidden",
-          div(class = "bg-blue-600 text-white px-6 py-3 font-semibold", "1. Overall Multi-Environment Variance (Stage 2)"),
-          div(class = "p-6",
-              div(class = "grid grid-cols-1 md:grid-cols-3 gap-4 mb-6",
-                  div(class = "bg-blue-50 rounded-lg p-4 text-center border border-blue-100",
-                      div(class = "text-xs text-blue-600 font-bold uppercase tracking-wider", "Genotype Variance"),
-                      div(class = "text-3xl font-bold text-blue-900 mt-1", res$stats$Vg)
-                  ),
-                  div(class = "bg-gray-50 rounded-lg p-4 text-center border border-gray-200",
-                      div(class = "text-xs text-gray-500 font-bold uppercase tracking-wider", "Trial Variance"),
-                      div(class = "text-3xl font-bold text-gray-800 mt-1", res$stats$Vt)
-                  ),
-                  div(class = "bg-indigo-50 rounded-lg p-4 text-center border border-indigo-100",
-                      div(class = "text-xs text-indigo-600 font-bold uppercase tracking-wider", "Residual Variance"),
-                      div(class = "text-3xl font-bold text-indigo-900 mt-1", res$stats$Ve)
-                  )
-              ),
-              hr(class = "border-gray-200 mb-4"),
-              h4(class = "text-lg text-gray-800", HTML(paste0("Overall Cullis Heritability (H&sup2;): <strong class='text-blue-600'>", res$stats$H2, "</strong>")))
-          )
-      ),
-      
-      # Stage 1 Table
-      div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
-          div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
-              span(class = "font-semibold text-gray-800", "2. Stage 1: Trial BLUEs & Reliability Weights"),
-              downloadButton("dl_s1", "Download BLUEs", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
-          ),
-          div(class = "p-6",
-              p(class = "text-sm text-gray-500 mb-4", "Notice the Weight column. Trials with high Standard Errors (SE) receive tiny weights."),
-              DTOutput("tbl_s1")
-          )
-      ),
-      
-      # Stage 2 Table
-      div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
-          div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
-              span(class = "font-semibold text-gray-800", "3. Final Multi-Environment BLUPs (Stage 2)"),
-              downloadButton("dl_s2", "Download BLUPs", class = "bg-white hover:bg-gray-100 text-green-600 font-medium py-1 px-3 border border-green-200 rounded text-sm transition")
-          ),
-          div(class = "p-6",
-              p(class = "text-sm text-gray-500 mb-4", HTML(paste0("Grand Mean across all weighted trials is <strong class='text-gray-900'>", res$stats$GM, "</strong>."))),
-              DTOutput("tbl_s2")
-          )
-      )
-    )
+    h4(class = "text-lg text-gray-800", HTML(paste0("Overall Cullis Heritability (H&sup2;): <strong class='text-blue-600'>", analysis_results()$stats$H2, "</strong>")))
   })
   
-  # Table Renderers
+  output$gm_ui <- renderUI({
+    req(analysis_results())
+    p(class = "text-sm text-gray-500 mb-4", HTML(paste0("Grand Mean across all weighted trials is <strong class='text-gray-900'>", analysis_results()$stats$GM, "</strong>.")))
+  })
+  
+  # Table Renderers - explicitly wrapping in DT::datatable() to force dependencies
   output$tbl_s1 <- renderDT({
     req(analysis_results())
-    analysis_results()$s1
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE,
-    scrollY = "400px",      
-    scrollCollapse = TRUE   
-  ))
+    DT::datatable(analysis_results()$s1, options = list(
+      pageLength = 10, 
+      scrollX = TRUE
+      # scrollY and scrollCollapse removed to avoid Shinylive layout calculations crashing
+    ))
+  })
   
   output$tbl_s2 <- renderDT({
     req(analysis_results())
-    analysis_results()$s2
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE          
-  ))
+    DT::datatable(analysis_results()$s2, options = list(
+      pageLength = 25, 
+      scrollX = TRUE          
+    ))
+  })
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
