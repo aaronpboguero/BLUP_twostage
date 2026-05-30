@@ -2,12 +2,12 @@
 library(shiny)
 library(lme4)
 library(emmeans)
-library(DT) # Replaces the deprecated Shiny tables
+library(DT)
 
 # --- USER INTERFACE ---
 ui <- bootstrapPage(
   
-  # THIS INJECTS TAILWIND CSS DIRECTLY!
+  # Inject Tailwind CSS
   tags$head(tags$script(src = "https://cdn.tailwindcss.com")),
   
   div(class = "min-h-screen bg-gray-50 p-4 md:p-8 font-sans",
@@ -33,7 +33,7 @@ ui <- bootstrapPage(
           # Error display
           uiOutput("error_ui"),
           
-          # SHINYLIVE FIX: Use conditionalPanel instead of renderUI for complex HTML widgets
+          # SHINYLIVE UI STRUCTURE: Elements are hidden until data is ready
           conditionalPanel(
             condition = "output.analysis_ready",
             
@@ -138,17 +138,19 @@ server <- function(input, output, session) {
           }
           
           em <- as.data.frame(emmeans(m1, "Name"))
-          em$Weight <- 1 / (em$SE^2)
+          
+          # SHINYLIVE FIX: Handle potential Inf weights and round cleanly for JSON payload
+          raw_weight <- ifelse(em$SE == 0, 0, 1 / (em$SE^2)) 
           
           stage1_results[[trial_name]] <- data.frame(
             Trial_Code = trial_name,
             Genotype = em$Name,
             BLUE = round(em$emmean, 3),
             SE = round(em$SE, 3),
-            Weight = em$Weight
+            Weight = round(raw_weight, 4) 
           )
         }, error = function(e) {
-          # Skip singular fits silently for cleaner UI
+          # Skip singular fits silently
         })
       }
       
@@ -205,7 +207,6 @@ server <- function(input, output, session) {
     div(class = "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4", error_msg())
   })
   
-  # Map top-level stats individually
   output$vg_val <- renderText({ req(analysis_results()); analysis_results()$stats$Vg })
   output$vt_val <- renderText({ req(analysis_results()); analysis_results()$stats$Vt })
   output$ve_val <- renderText({ req(analysis_results()); analysis_results()$stats$Ve })
@@ -220,23 +221,26 @@ server <- function(input, output, session) {
     p(class = "text-sm text-gray-500 mb-4", HTML(paste0("Grand Mean across all weighted trials is <strong class='text-gray-900'>", analysis_results()$stats$GM, "</strong>.")))
   })
   
-  # Table Renderers - explicitly wrapping in DT::datatable() to force dependencies
+  # SHINYLIVE FIX: Added `server = FALSE` and `rownames = FALSE` to prevent Wasm crashes
   output$tbl_s1 <- renderDT({
     req(analysis_results())
-    DT::datatable(analysis_results()$s1, options = list(
-      pageLength = 10, 
-      scrollX = TRUE
-      # scrollY and scrollCollapse removed to avoid Shinylive layout calculations crashing
-    ))
-  })
+    DT::datatable(analysis_results()$s1, 
+                  rownames = FALSE,
+                  options = list(
+                    pageLength = 25, 
+                    scrollX = TRUE
+                  ))
+  }, server = FALSE) # <--- CRITICAL FIX HERE
   
   output$tbl_s2 <- renderDT({
     req(analysis_results())
-    DT::datatable(analysis_results()$s2, options = list(
-      pageLength = 25, 
-      scrollX = TRUE          
-    ))
-  })
+    DT::datatable(analysis_results()$s2, 
+                  rownames = FALSE,
+                  options = list(
+                    pageLength = 25, 
+                    scrollX = TRUE          
+                  ))
+  }, server = FALSE) # <--- CRITICAL FIX HERE
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
