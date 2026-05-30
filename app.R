@@ -2,23 +2,13 @@
 library(shiny)
 library(lme4)
 library(emmeans)
-library(DT)
+library(reactable) # Swapped DT for modern Reactable
 
 # --- USER INTERFACE ---
 ui <- bootstrapPage(
   
   # Inject Tailwind CSS
-  tags$head(
-    tags$script(src = "https://cdn.tailwindcss.com"),
-    # Protect standard Shiny tables from Tailwind's preflight reset
-    tags$style(HTML("
-      #tbl_s1 table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-      #tbl_s1 th, #tbl_s1 td { border: 1px solid #e5e7eb; padding: 0.75rem; text-align: left; color: #374151; }
-      #tbl_s1 th { background-color: #f3f4f6; font-weight: 600; color: #1f2937; }
-      #tbl_s1 tr:nth-child(even) { background-color: #f9fafb; }
-      #tbl_s1 tr:hover { background-color: #f3f4f6; }
-    "))
-  ),
+  tags$head(tags$script(src = "https://cdn.tailwindcss.com")),
   
   div(class = "min-h-screen bg-gray-50 p-4 md:p-8 font-sans",
       
@@ -70,19 +60,19 @@ ui <- bootstrapPage(
                 )
             ),
             
-            # Stage 1 Table (Swapped to Wasm-Safe Native HTML Table)
+            # Stage 1 Table (Reactable)
             div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
                 div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
                     span(class = "font-semibold text-gray-800", "2. Stage 1: Trial BLUEs & Reliability Weights"),
                     downloadButton("dl_s1", "Download BLUEs", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
                 ),
-                div(class = "p-6 overflow-x-auto h-96",
+                div(class = "p-6",
                     p(class = "text-sm text-gray-500 mb-4", "Notice the Weight column. Trials with high Standard Errors (SE) receive tiny weights."),
-                    tableOutput("tbl_s1") # Standard Shiny Table Output
+                    reactableOutput("tbl_s1") # Replaced DTOutput
                 )
             ),
             
-            # Stage 2 Table (Kept as DT)
+            # Stage 2 Table (Reactable)
             div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
                 div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
                     span(class = "font-semibold text-gray-800", "3. Final Multi-Environment BLUPs (Stage 2)"),
@@ -90,7 +80,7 @@ ui <- bootstrapPage(
                 ),
                 div(class = "p-6",
                     uiOutput("gm_ui"),
-                    DTOutput("tbl_s2")
+                    reactableOutput("tbl_s2") # Replaced DTOutput
                 )
             )
           )
@@ -149,7 +139,6 @@ server <- function(input, output, session) {
           
           em <- as.data.frame(emmeans(m1, "Name"))
           
-          # Catch NA/Inf values to prevent Wasm Wasm serialization crashes
           raw_weight <- ifelse(is.na(em$SE) | em$SE == 0, 0, 1 / (em$SE^2)) 
           
           stage1_results[[trial_name]] <- data.frame(
@@ -231,22 +220,45 @@ server <- function(input, output, session) {
     p(class = "text-sm text-gray-500 mb-4", HTML(paste0("Grand Mean across all weighted trials is <strong class='text-gray-900'>", analysis_results()$stats$GM, "</strong>.")))
   })
   
-  # SHINYLIVE FIX: Use standard Shiny renderTable (guaranteed to render in Wasm without crashing)
-  output$tbl_s1 <- renderTable({
+  # Render Stage 1 with Reactable
+  output$tbl_s1 <- renderReactable({
     req(analysis_results())
-    analysis_results()$s1
-  }, rownames = FALSE, digits = 3)
+    reactable(
+      analysis_results()$s1,
+      pagination = TRUE,
+      defaultPageSize = 10,
+      searchable = TRUE,
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      theme = reactableTheme(
+        borderColor = "#e5e7eb",
+        stripedColor = "#f9fafb",
+        highlightColor = "#f3f4f6",
+        cellPadding = "8px 12px"
+      )
+    )
+  })
   
-  # Stage 2 can safely use DT since it's the only one initializing
-  output$tbl_s2 <- renderDT({
+  # Render Stage 2 with Reactable
+  output$tbl_s2 <- renderReactable({
     req(analysis_results())
-    DT::datatable(analysis_results()$s2, 
-                  rownames = FALSE,
-                  options = list(
-                    pageLength = 25, 
-                    scrollX = TRUE          
-                  ))
-  }, server = FALSE) 
+    reactable(
+      analysis_results()$s2,
+      pagination = TRUE,
+      defaultPageSize = 25,
+      searchable = TRUE,
+      striped = TRUE,
+      highlight = TRUE,
+      compact = TRUE,
+      theme = reactableTheme(
+        borderColor = "#e5e7eb",
+        stripedColor = "#f9fafb",
+        highlightColor = "#f3f4f6",
+        cellPadding = "8px 12px"
+      )
+    )
+  })
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(

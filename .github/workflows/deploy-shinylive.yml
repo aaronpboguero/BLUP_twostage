@@ -44,8 +44,7 @@ jobs:
 
       - name: Install R Packages
         run: |
-          # Removing the explicit CRAN repo forces R to use the faster RSPM binaries
-          Rscript -e "install.packages(c('shinylive', 'lme4', 'emmeans', 'DT'))"
+          Rscript -e "install.packages(c('shinylive', 'lme4', 'emmeans', 'reactable'), repos = 'https://cran.rstudio.com/')"
           
       - name: Cache Shinylive Assets
         uses: actions/cache@v4
