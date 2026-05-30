@@ -5,36 +5,22 @@ library(emmeans)
 library(DT) # Replaces the deprecated Shiny tables
 
 # --- USER INTERFACE ---
-ui <- bootstrapPage(
+# --- USER INTERFACE ---
+ui <- page_sidebar(
+  title = "Multi-Environment Trial Analyzer (Two-Stage Model)",
+  theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#2563eb"),
   
-  # THIS INJECTS TAILWIND CSS DIRECTLY!
-  tags$head(tags$script(src = "https://cdn.tailwindcss.com")),
+  # Sidebar for controls
+  sidebar = sidebar(
+    fileInput("file", "Upload Trial Data (CSV)", accept = ".csv"),
+    actionButton("run", "Run Two-Stage Analysis", class = "btn-primary", width = "100%"),
+    hr(),
+    helpText("Note: Processing complex LMMs in the browser may take a few moments depending on dataset size.")
+  ),
   
-  div(class = "min-h-screen bg-gray-50 p-4 md:p-8 font-sans",
-      
-      div(class = "max-w-6xl mx-auto space-y-6",
-          
-          # Header Card
-          div(class = "bg-white rounded-xl shadow-sm p-6 border border-gray-100",
-              h1(class = "text-2xl font-bold text-blue-700 mb-2", "Multi-Environment Trial Analyzer (Two-Stage Model)"),
-              p(class = "text-gray-500 text-sm", "Note: Processing complex LMMs in the browser may take a few moments depending on dataset size.")
-          ),
-          
-          # Upload Controls
-          div(class = "bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row gap-4 items-end",
-              div(class = "flex-1 w-full",
-                  fileInput("file", "Upload Trial Data (CSV)", accept = ".csv", width = "100%")
-              ),
-              div(class = "w-full md:w-auto mb-4",
-                  actionButton("run", "Run Two-Stage Analysis", class = "w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow transition-colors")
-              )
-          ),
-          
-          # Main panel for results
-          uiOutput("error_ui"),
-          uiOutput("results_ui")
-      )
-  )
+  # Main panel for results
+  uiOutput("error_ui"),
+  uiOutput("results_ui")
 )
 
 # --- SERVER LOGIC ---
@@ -154,26 +140,18 @@ server <- function(input, output, session) {
     
     tagList(
       # Top level stats
-      div(class = "bg-white rounded-xl shadow-sm border border-blue-200 mb-8 overflow-hidden",
-          div(class = "bg-blue-600 text-white px-6 py-3 font-semibold", "1. Overall Multi-Environment Variance (Stage 2)"),
-          div(class = "p-6",
-              div(class = "grid grid-cols-1 md:grid-cols-3 gap-4 mb-6",
-                  div(class = "bg-blue-50 rounded-lg p-4 text-center border border-blue-100",
-                      div(class = "text-xs text-blue-600 font-bold uppercase tracking-wider", "Genotype Variance"),
-                      div(class = "text-3xl font-bold text-blue-900 mt-1", res$stats$Vg)
-                  ),
-                  div(class = "bg-gray-50 rounded-lg p-4 text-center border border-gray-200",
-                      div(class = "text-xs text-gray-500 font-bold uppercase tracking-wider", "Trial Variance"),
-                      div(class = "text-3xl font-bold text-gray-800 mt-1", res$stats$Vt)
-                  ),
-                  div(class = "bg-indigo-50 rounded-lg p-4 text-center border border-indigo-100",
-                      div(class = "text-xs text-indigo-600 font-bold uppercase tracking-wider", "Residual Variance"),
-                      div(class = "text-3xl font-bold text-indigo-900 mt-1", res$stats$Ve)
-                  )
-              ),
-              hr(class = "border-gray-200 mb-4"),
-              h4(class = "text-lg text-gray-800", HTML(paste0("Overall Cullis Heritability (H&sup2;): <strong class='text-blue-600'>", res$stats$H2, "</strong>")))
-          )
+      card(
+        class = "bg-light mb-4 border-primary",
+        card_header("1. Overall Multi-Environment Variance (Stage 2)", class = "bg-primary text-white"),
+        card_body(
+          layout_columns(
+            value_box("Genotype Variance", value = res$stats$Vg, theme = "primary"),
+            value_box("Trial Variance", value = res$stats$Vt, theme = "secondary"),
+            value_box("Residual Variance", value = res$stats$Ve, theme = "info")
+          ),
+          hr(),
+          h4(HTML(paste0("Overall Cullis Heritability (H&sup2;): <strong class='text-primary'>", res$stats$H2, "</strong>")))
+        )
       ),
       
       # Stage 1 Table
@@ -206,20 +184,12 @@ server <- function(input, output, session) {
   output$tbl_s1 <- renderDT({
     req(analysis_results())
     analysis_results()$s1
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE,
-    scrollY = "400px",      
-    scrollCollapse = TRUE   
-  ))
+  }, options = list(pageLength = 5, scrollX = TRUE))
   
   output$tbl_s2 <- renderDT({
     req(analysis_results())
     analysis_results()$s2
-  }, options = list(
-    pageLength = 50, 
-    scrollX = TRUE          
-  ))
+  }, options = list(pageLength = 10, scrollX = TRUE))
   
   # Download Handlers
   output$dl_s1 <- downloadHandler(
