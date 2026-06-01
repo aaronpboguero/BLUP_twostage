@@ -125,9 +125,18 @@ server <- function(input, output, session) {
       # --- STAGE 2: Multi-Environment BLUPs ---
       grand_mean <- mean(stage1_df$BLUE, na.rm = TRUE)
       
+      # Count how many unique trials are in the dataset
+      n_trials <- length(unique(stage1_df$Trial_Code))
+      
       if(has_parents) {
         # NCII Combining Ability Model
-        m2 <- lmer(BLUE ~ (1|Female) + (1|Male) + (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
+        if(n_trials > 1) {
+          # Multi-Environment: Include Trial_Code
+          m2 <- lmer(BLUE ~ (1|Female) + (1|Male) + (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
+        } else {
+          # Single Trial: Drop Trial_Code to prevent error
+          m2 <- lmer(BLUE ~ (1|Female) + (1|Male) + (1|Genotype), weights = Weight, data = stage1_df)
+        }
         
         # Extract GCAs
         f_gca <- data.frame(Female = rownames(ranef(m2)$Female), GCA_Female = round(ranef(m2)$Female$`(Intercept)`, 3))
@@ -142,7 +151,11 @@ server <- function(input, output, session) {
         
       } else {
         # Standard Hybrid Model
-        m2 <- lmer(BLUE ~ (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
+        if(n_trials > 1) {
+          m2 <- lmer(BLUE ~ (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
+        } else {
+          m2 <- lmer(BLUE ~ (1|Genotype), weights = Weight, data = stage1_df)
+        }
         f_gca <- NULL
         m_gca <- NULL
         sca_df <- NULL
