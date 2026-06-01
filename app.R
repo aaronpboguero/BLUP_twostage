@@ -33,15 +33,17 @@ ui <- bootstrapPage(
             condition = "output.analysis_ready",
             
             div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
-                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200",
-                    span(class = "font-semibold text-gray-800", "1. Stage 1: Trial BLUEs & Weights")
+                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
+                    span(class = "font-semibold text-gray-800", "1. Stage 1: Trial BLUEs & Weights"),
+                    downloadButton("dl_s1", "Download CSV", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
                 ),
                 div(class = "p-6", reactableOutput("tbl_s1"))
             ),
             
             div(class = "bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden",
-                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200",
-                    span(class = "font-semibold text-gray-800", "2. Final Multi-Environment Hybrid BLUPs")
+                div(class = "bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center",
+                    span(class = "font-semibold text-gray-800", "2. Final Multi-Environment Hybrid BLUPs"),
+                    downloadButton("dl_s2", "Download CSV", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
                 ),
                 div(class = "p-6", reactableOutput("tbl_s2"))
             ),
@@ -91,7 +93,6 @@ server <- function(input, output, session) {
         d <- split_data[[trial_name]]
         if(length(unique(d$Name)) < 2) next 
         
-        # Explicitly drop unused levels for the subset
         d$Rep <- droplevels(d$Rep)
         
         tryCatch({
@@ -115,7 +116,6 @@ server <- function(input, output, session) {
       if(has_parents) {
         parent_map <- unique(data[, c("Name", "Female", "Male")])
         stage1_df <- merge(stage1_df, parent_map, by.x = "Genotype", by.y = "Name", all.x = TRUE)
-        # Drop rows where parent data is NA to prevent LMM crashes
         stage1_df <- stage1_df[!is.na(stage1_df$Female) & !is.na(stage1_df$Male), ]
       }
       
@@ -126,7 +126,6 @@ server <- function(input, output, session) {
       tryCatch({
         if(has_parents) {
           if(n_trials > 1) {
-            # Multi-Environment NCII
             m2 <- lmer(BLUE ~ (1|Female) + (1|Male) + (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
             
             f_gca <- data.frame(Female = rownames(ranef(m2)$Female), GCA_Female = round(ranef(m2)$Female$`(Intercept)`, 3))
@@ -137,17 +136,13 @@ server <- function(input, output, session) {
             names(blup_values) <- rownames(ranef(m2)$Genotype)
             
           } else {
-            # Single-Environment NCII
-            # We drop (1|Genotype) because n_levels == n_obs. SCA becomes the residual error.
             m2 <- lmer(BLUE ~ (1|Female) + (1|Male), weights = Weight, data = stage1_df)
             
             f_gca <- data.frame(Female = rownames(ranef(m2)$Female), GCA_Female = round(ranef(m2)$Female$`(Intercept)`, 3))
             m_gca <- data.frame(Male = rownames(ranef(m2)$Male), GCA_Male = round(ranef(m2)$Male$`(Intercept)`, 3))
             
-            # Extract SCA from the model residuals
             sca_df <- data.frame(Hybrid = stage1_df$Genotype, SCA = round(residuals(m2), 3))
             
-            # Hybrid predicted yield falls back to adjusted BLUEs for a single location
             blup_values <- stage1_df$BLUE - grand_mean
             names(blup_values) <- stage1_df$Genotype
           }
@@ -157,7 +152,6 @@ server <- function(input, output, session) {
           sca_df <- sca_df[order(-sca_df$SCA), , drop = FALSE]
           
         } else {
-          # Standard Hybrid Model (No Parents)
           if(n_trials > 1) {
             m2 <- lmer(BLUE ~ (1|Genotype) + (1|Trial_Code), weights = Weight, data = stage1_df)
             blup_values <- ranef(m2)$Genotype$`(Intercept)`
@@ -170,7 +164,6 @@ server <- function(input, output, session) {
         }
       }, error = function(e) stop(paste("Stage 2 Error:", e$message)))
       
-      # Build final hybrid BLUP table
       blup_df <- data.frame(
         Genotype = names(blup_values),
         Predicted_Yield = round(grand_mean + blup_values, 3)
@@ -198,15 +191,8 @@ server <- function(input, output, session) {
     div(class = "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4", error_msg())
   })
   
-  output$tbl_s1 <- renderReactable({
-    req(analysis_results())
-    reactable(analysis_results()$s1, pagination = TRUE, defaultPageSize = 5, compact = TRUE)
-  })
-  
-  output$tbl_s2 <- renderReactable({
-    req(analysis_results())
-    reactable(analysis_results()$s2, pagination = TRUE, defaultPageSize = 5, compact = TRUE)
-  })
+  output$tbl_s1 <- renderReactable({ req(analysis_results()); reactable(analysis_results()$s1, pagination = TRUE, defaultPageSize = 5, compact = TRUE) })
+  output$tbl_s2 <- renderReactable({ req(analysis_results()); reactable(analysis_results()$s2, pagination = TRUE, defaultPageSize = 5, compact = TRUE) })
   
   output$ca_tables_ui <- renderUI({
     req(analysis_results())
@@ -214,20 +200,23 @@ server <- function(input, output, session) {
     
     div(class = "space-y-8",
         div(class = "bg-white rounded-xl shadow-sm border border-pink-200 overflow-hidden",
-            div(class = "bg-pink-50 px-6 py-3 border-b border-pink-200",
-                span(class = "font-semibold text-pink-800", "3A. Female Parent GCA")
+            div(class = "bg-pink-50 px-6 py-3 border-b border-pink-200 flex justify-between items-center",
+                span(class = "font-semibold text-pink-800", "3A. Female Parent GCA"),
+                downloadButton("dl_f_gca", "Download CSV", class = "bg-white hover:bg-gray-100 text-pink-600 font-medium py-1 px-3 border border-pink-200 rounded text-sm transition")
             ),
             div(class = "p-6", reactableOutput("tbl_f_gca"))
         ),
         div(class = "bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden",
-            div(class = "bg-blue-50 px-6 py-3 border-b border-blue-200",
-                span(class = "font-semibold text-blue-800", "3B. Male Parent GCA")
+            div(class = "bg-blue-50 px-6 py-3 border-b border-blue-200 flex justify-between items-center",
+                span(class = "font-semibold text-blue-800", "3B. Male Parent GCA"),
+                downloadButton("dl_m_gca", "Download CSV", class = "bg-white hover:bg-gray-100 text-blue-600 font-medium py-1 px-3 border border-blue-200 rounded text-sm transition")
             ),
             div(class = "p-6", reactableOutput("tbl_m_gca"))
         ),
         div(class = "bg-white rounded-xl shadow-sm border border-purple-200 overflow-hidden",
-            div(class = "bg-purple-50 px-6 py-3 border-b border-purple-200",
-                span(class = "font-semibold text-purple-800", "3C. Specific Combining Ability (SCA)")
+            div(class = "bg-purple-50 px-6 py-3 border-b border-purple-200 flex justify-between items-center",
+                span(class = "font-semibold text-purple-800", "3C. Specific Combining Ability (SCA)"),
+                downloadButton("dl_sca", "Download CSV", class = "bg-white hover:bg-gray-100 text-purple-600 font-medium py-1 px-3 border border-purple-200 rounded text-sm transition")
             ),
             div(class = "p-6", reactableOutput("tbl_sca"))
         )
@@ -237,6 +226,28 @@ server <- function(input, output, session) {
   output$tbl_f_gca <- renderReactable({ reactable(analysis_results()$f_gca, compact = TRUE) })
   output$tbl_m_gca <- renderReactable({ reactable(analysis_results()$m_gca, compact = TRUE) })
   output$tbl_sca <- renderReactable({ reactable(analysis_results()$sca, compact = TRUE) })
+  
+  # --- DOWNLOAD HANDLERS ---
+  output$dl_s1 <- downloadHandler(
+    filename = function() { "Stage1_BLUEs.csv" },
+    content = function(file) { write.csv(analysis_results()$s1, file, row.names = FALSE) }
+  )
+  output$dl_s2 <- downloadHandler(
+    filename = function() { "Stage2_Hybrid_BLUPs.csv" },
+    content = function(file) { write.csv(analysis_results()$s2, file, row.names = FALSE) }
+  )
+  output$dl_f_gca <- downloadHandler(
+    filename = function() { "Female_GCA.csv" },
+    content = function(file) { write.csv(analysis_results()$f_gca, file, row.names = FALSE) }
+  )
+  output$dl_m_gca <- downloadHandler(
+    filename = function() { "Male_GCA.csv" },
+    content = function(file) { write.csv(analysis_results()$m_gca, file, row.names = FALSE) }
+  )
+  output$dl_sca <- downloadHandler(
+    filename = function() { "Hybrid_SCA.csv" },
+    content = function(file) { write.csv(analysis_results()$sca, file, row.names = FALSE) }
+  )
 }
 
 shinyApp(ui, server)
