@@ -8,21 +8,26 @@ library(reactable)
 ui <- bootstrapPage(
   
   tags$head(
-    tags$script(src = "https://cdn.tailwindcss.com"),
-    # Inject JavaScript to handle client-side downloads for Shinylive
-    tags$script(HTML("
-      Shiny.addCustomMessageHandler('download_csv', function(data) {
-        var blob = new Blob([data.content], {type: 'text/csv'});
-        var url = window.URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename;
-        document.body.appendChild(a);
-        a.click();
+  tags$script(src = "https://cdn.tailwindcss.com"),
+  # Inject JavaScript to handle client-side downloads for Shinylive
+  tags$script(HTML("
+    Shiny.addCustomMessageHandler('download_csv', function(data) {
+      var blob = new Blob([data.content], {type: 'text/csv;charset=utf-8;'});
+      var url = window.URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Delay the cleanup by 1 second so the browser has time to fetch the file
+      setTimeout(function() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-      });
-    "))
+      }, 1000); 
+    });
+  "))
   ),
   
   div(class = "min-h-screen bg-gray-50 p-4 md:p-8 font-sans",
@@ -234,8 +239,15 @@ server <- function(input, output, session) {
   
   # --- SHINYLIVE CLIENT-SIDE DOWNLOAD HANDLERS ---
   send_csv_to_browser <- function(df, filename) {
-    csv_string <- paste(capture.output(write.csv(df, row.names = FALSE)), collapse = "\n")
-    session$sendCustomMessage("download_csv", list(content = csv_string, filename = filename))
+  # Write to webR's virtual temporary file system
+  tmp <- tempfile(fileext = ".csv")
+  write.csv(df, tmp, row.names = FALSE)
+  
+  # Read the file back as a single string
+  csv_string <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
+  
+  # Send to the frontend
+  session$sendCustomMessage("download_csv", list(content = csv_string, filename = filename))
   }
   
   observeEvent(input$dl_s1, { req(analysis_results()); send_csv_to_browser(analysis_results()$s1, "Stage1_BLUEs.csv") })
