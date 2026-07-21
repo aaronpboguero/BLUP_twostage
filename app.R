@@ -8,35 +8,56 @@ library(reactable)
 ui <- bootstrapPage(
   
   tags$head(
-  tags$script(src = "https://cdn.tailwindcss.com"),
-  # Inject JavaScript to handle client-side downloads for Shinylive
-  tags$script(HTML("
-    Shiny.addCustomMessageHandler('download_csv', function(data) {
-      var blob = new Blob([data.content], {type: 'text/csv;charset=utf-8;'});
-      var url = window.URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = data.filename;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Delay the cleanup by 1 second so the browser has time to fetch the file
-      setTimeout(function() {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 1000); 
-    });
-  "))
+    tags$script(src = "https://cdn.tailwindcss.com"),
+    # Inject JavaScript to handle client-side downloads for Shinylive
+    tags$script(HTML("
+      Shiny.addCustomMessageHandler('download_csv', function(data) {
+        var blob = new Blob([data.content], {type: 'text/csv;charset=utf-8;'});
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = data.filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Delay the cleanup by 1 second so the browser has time to fetch the file
+        setTimeout(function() {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 1000); 
+      });
+    ")),
+    # Inject JavaScript to hide the loading screen once Shiny connects
+    tags$script(HTML("
+      $(document).on('shiny:connected', function(event) {
+        $('#loading-screen').fadeOut(500);
+      });
+    "))
+  ),
+  
+  # --- LOADING SCREEN ---
+  div(id = "loading-screen", class = "fixed inset-0 z-50 flex items-center justify-center bg-gray-50",
+      div(class = "text-center",
+          h2(class = "text-3xl font-bold text-blue-700 animate-pulse", "Loading R in your browser..."),
+          p(class = "text-gray-500 mt-4", "Please wait a moment while the environment initializes.")
+      )
   ),
   
   div(class = "min-h-screen bg-gray-50 p-4 md:p-8 font-sans",
       
       div(class = "max-w-6xl mx-auto space-y-6",
           
+          # --- INSTRUCTIONAL NOTES ---
           div(class = "bg-white rounded-xl shadow-sm p-6 border border-gray-100",
               h1(class = "text-2xl font-bold text-blue-700 mb-2", "Multi-Environment Trial Analyzer"),
-              p(class = "text-gray-500 text-sm", "Upload your data. Include 'Female' and 'Male' columns to automatically extract GCA and SCA.")
+              p(class = "text-gray-700 font-medium mb-2", "Please ensure your uploaded CSV contains the following headers:"),
+              tags$ul(class = "list-disc list-inside text-sm text-gray-600 mb-4 space-y-1",
+                      tags$li(strong("Required: "), "'Name' (Genotype), 'Rep' (Replicate), and 'YLD_MKT.P' (Yield/Response)."),
+                      tags$li(strong("Trial Identification: "), "Must include 'Trial.Code'. If omitted, you must provide both 'Location' and 'Season' to automatically generate trial codes."),
+                      tags$li(strong("Optional (for GCA & SCA): "), "Include 'Female' and 'Male' columns to automatically extract Combining Abilities.")
+              ),
+              p(class = "text-gray-500 text-sm italic", "Upload your formatted data below to begin the analysis.")
           ),
           
           div(class = "bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col md:flex-row gap-4 items-end",
@@ -239,15 +260,15 @@ server <- function(input, output, session) {
   
   # --- SHINYLIVE CLIENT-SIDE DOWNLOAD HANDLERS ---
   send_csv_to_browser <- function(df, filename) {
-  # Write to webR's virtual temporary file system
-  tmp <- tempfile(fileext = ".csv")
-  write.csv(df, tmp, row.names = FALSE)
-  
-  # Read the file back as a single string
-  csv_string <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
-  
-  # Send to the frontend
-  session$sendCustomMessage("download_csv", list(content = csv_string, filename = filename))
+    # Write to webR's virtual temporary file system
+    tmp <- tempfile(fileext = ".csv")
+    write.csv(df, tmp, row.names = FALSE)
+    
+    # Read the file back as a single string
+    csv_string <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
+    
+    # Send to the frontend
+    session$sendCustomMessage("download_csv", list(content = csv_string, filename = filename))
   }
   
   observeEvent(input$dl_s1, { req(analysis_results()); send_csv_to_browser(analysis_results()$s1, "Stage1_BLUEs.csv") })
